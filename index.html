@@ -127,6 +127,10 @@ function renderApp(){
         <h1>라커룸 찾기</h1>
       </div>
       <div style="display:flex; align-items:center; gap:8px;">
+        <button id="requestsBtn" style="display:none; position:relative; font-size:11px; font-weight:700; color:#7a4f10; background:#fff7e6; border:1px solid var(--brass); border-radius:8px; padding:6px 10px; cursor:pointer;">
+          요청함 <span id="reqCount" style="display:none; background:#d94f39; color:#fff; border-radius:999px; padding:1px 6px; font-size:10px; margin-left:2px;"></span>
+        </button>
+        <button id="adminBtn" title="관리자 모드" style="font-size:15px; background:none; border:none; cursor:pointer; padding:4px;">🔒</button>
         <button id="installBtn" style="display:none; font-size:11px; font-weight:700; color:#7a4f10; background:#fff7e6; border:1px solid var(--brass); border-radius:8px; padding:6px 10px; cursor:pointer;">
           + 홈 화면에 추가
         </button>
@@ -170,6 +174,27 @@ function renderApp(){
       </div>
     </div>
 
+    <div class="modal-backdrop" id="pinBackdrop">
+      <div class="modal">
+        <div class="mtitle">관리자 PIN 입력</div>
+        <input id="pinInput" type="tel" inputmode="numeric" placeholder="PIN 번호" />
+        <div class="row">
+          <button class="btn-cancel" id="pinCancel">취소</button>
+          <button class="btn-save" id="pinSubmit">확인</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="requestsBackdrop">
+      <div class="modal" style="max-height:70vh; overflow:auto;">
+        <div class="mtitle">대기 중인 변경 요청</div>
+        <div id="requestsList" style="display:flex; flex-direction:column; gap:10px; margin-bottom:14px;"></div>
+        <div class="row">
+          <button class="btn-cancel" id="requestsClose" style="flex:1;">닫기</button>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-backdrop" id="iosBackdrop">
       <div class="modal">
         <div class="mtitle">홈 화면에 추가하는 방법</div>
@@ -192,6 +217,7 @@ function renderApp(){
   loadData();
   wireSearch();
   wireModal();
+  wireAdmin();
 }
 
 function drawFloor(){
@@ -366,13 +392,14 @@ function wireSearch(){
   }
 }
 
-let editingTarget = null;
-
 function openEditModal(lockerEl){
   editingTarget = lockerEl;
+  const isAdmin = !!localStorage.getItem('lockerAdminPin');
   document.getElementById('modalMeta').textContent =
-    `${lockerEl.dataset.zone} · ${lockerEl.dataset.col}열 ${lockerEl.dataset.row}행`;
+    `${lockerEl.dataset.zone} · ${lockerEl.dataset.col}열 ${lockerEl.dataset.row}행` +
+    (isAdmin ? '' : ' · 이름이 틀렸다면 변경을 요청할 수 있어요');
   document.getElementById('modalInput').value = lockerEl.dataset.name;
+  document.getElementById('modalSave').textContent = isAdmin ? '저장' : '변경 요청 보내기';
   document.getElementById('modalBackdrop').classList.add('show');
   setTimeout(() => document.getElementById('modalInput').focus(), 50);
 }
@@ -393,32 +420,173 @@ function wireModal(){
 
     const col = editingTarget.dataset.col;
     const row = editingTarget.dataset.row;
+    const oldName = editingTarget.dataset.name;
+    const pin = localStorage.getItem('lockerAdminPin');
+    const isAdmin = !!pin;
+
     const saveBtn = document.getElementById('modalSave');
-    saveBtn.textContent = '저장 중...';
+    const originalLabel = saveBtn.textContent;
+    saveBtn.textContent = '처리 중...';
     saveBtn.disabled = true;
 
     try {
+      const payload = isAdmin
+        ? { action: 'update', col: Number(col), row: Number(row), name: newName, pin }
+        : { action: 'request', col: Number(col), row: Number(row), oldName, name: newName };
+
       const res = await fetch(SCRIPT_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // preflight(OPTIONS) 회피용
-        body: JSON.stringify({ col: Number(col), row: Number(row), name: newName })
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
       });
       const result = await res.json();
       if(!result.ok) throw new Error(result.error || 'unknown error');
 
-      editingTarget.dataset.name = newName;
-      editingTarget.querySelector('.name').textContent = newName;
-      const idx = LOCKERS.findIndex(l => l.col == col && l.row == row);
-      if(idx > -1) LOCKERS[idx].name = newName;
+      if (isAdmin) {
+        editingTarget.dataset.name = newName;
+        editingTarget.querySelector('.name').textContent = newName;
+        const idx = LOCKERS.findIndex(l => l.col == col && l.row == row);
+        if(idx > -1) LOCKERS[idx].name = newName;
+      } else {
+        alert('변경 요청을 보냈어요. 관리자가 확인 후 반영할게요.');
+      }
       closeModal();
     } catch (err) {
-      alert('저장 실패: ' + err.message);
+      alert('처리 실패: ' + err.message);
     } finally {
-      saveBtn.textContent = '저장';
+      saveBtn.textContent = originalLabel;
       saveBtn.disabled = false;
     }
   });
 }
+
+function wireAdmin(){
+  const adminBtn = document.getElementById('adminBtn');
+  const pinBackdrop = document.getElementById('pinBackdrop');
+  const pinInput = document.getElementById('pinInput');
+  const pinCancel = document.getElementById('pinCancel');
+  const pinSubmit = document.getElementById('pinSubmit');
+  const requestsBtn = document.getElementById('requestsBtn');
+  const reqCount = document.getElementById('reqCount');
+  const requestsBackdrop = document.getElementById('requestsBackdrop');
+  const requestsList = document.getElementById('requestsList');
+  const requestsClose = document.getElementById('requestsClose');
+
+  function refreshAdminUI(){
+    const isAdmin = !!localStorage.getItem('lockerAdminPin');
+    adminBtn.textContent = isAdmin ? '🔓' : '🔒';
+    requestsBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+    if (isAdmin) refreshRequestCount();
+  }
+
+  adminBtn.addEventListener('click', () => {
+    if (localStorage.getItem('lockerAdminPin')) {
+      localStorage.removeItem('lockerAdminPin');
+      refreshAdminUI();
+      return;
+    }
+    pinBackdrop.classList.add('show');
+    setTimeout(() => pinInput.focus(), 50);
+  });
+  pinCancel.addEventListener('click', () => pinBackdrop.classList.remove('show'));
+  pinBackdrop.addEventListener('click', (e) => { if(e.target.id === 'pinBackdrop') pinBackdrop.classList.remove('show'); });
+
+  pinSubmit.addEventListener('click', async () => {
+    const pin = pinInput.value.trim();
+    if(!pin) return;
+    pinSubmit.textContent = '확인 중...';
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({ action:'checkPin', pin })
+      });
+      const result = await res.json();
+      if (result.ok) {
+        localStorage.setItem('lockerAdminPin', pin);
+        pinBackdrop.classList.remove('show');
+        pinInput.value = '';
+        refreshAdminUI();
+      } else {
+        alert('PIN이 올바르지 않아요.');
+      }
+    } catch(err) {
+      alert('확인 실패: ' + err.message);
+    } finally {
+      pinSubmit.textContent = '확인';
+    }
+  });
+
+  async function refreshRequestCount(){
+    const pin = localStorage.getItem('lockerAdminPin');
+    if(!pin) return;
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({ action:'listRequests', pin })
+      });
+      const result = await res.json();
+      if(result.ok && result.requests.length > 0){
+        reqCount.style.display = 'inline-block';
+        reqCount.textContent = result.requests.length;
+      } else {
+        reqCount.style.display = 'none';
+      }
+      return result.requests || [];
+    } catch(err){ return []; }
+  }
+
+  async function openRequestsPanel(){
+    const pin = localStorage.getItem('lockerAdminPin');
+    const requests = await refreshRequestCount();
+    requestsList.innerHTML = requests.length === 0
+      ? '<div style="font-size:13px; color:var(--paper-dim);">대기 중인 요청이 없어요.</div>'
+      : requests.map(r => `
+        <div style="border:1px solid var(--line); border-radius:10px; padding:10px;" data-id="${r.requestId}">
+          <div style="font-size:13px; color:var(--paper-dim); margin-bottom:4px;">${r.col}열 ${r.row}행</div>
+          <div style="font-size:15px; font-weight:700;">${r.oldName} → <span style="color:#7a4f10;">${r.requestedName}</span></div>
+          <div class="row" style="margin-top:8px;">
+            <button class="btn-cancel req-reject" data-id="${r.requestId}">거절</button>
+            <button class="btn-save req-approve" data-id="${r.requestId}">승인</button>
+          </div>
+        </div>
+      `).join('');
+
+    Array.from(requestsList.querySelectorAll('.req-approve')).forEach(btn => {
+      btn.addEventListener('click', () => handleRequestAction(btn.dataset.id, 'approve'));
+    });
+    Array.from(requestsList.querySelectorAll('.req-reject')).forEach(btn => {
+      btn.addEventListener('click', () => handleRequestAction(btn.dataset.id, 'reject'));
+    });
+
+    requestsBackdrop.classList.add('show');
+  }
+
+  async function handleRequestAction(requestId, action){
+    const pin = localStorage.getItem('lockerAdminPin');
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({ action, requestId: Number(requestId), pin })
+      });
+      const result = await res.json();
+      if(!result.ok) throw new Error(result.error || 'unknown error');
+      if (action === 'approve') await loadData(); // 화면에 바로 반영
+      openRequestsPanel(); // 목록 새로고침
+    } catch(err) {
+      alert('처리 실패: ' + err.message);
+    }
+  }
+
+  requestsBtn.addEventListener('click', openRequestsPanel);
+  requestsClose.addEventListener('click', () => requestsBackdrop.classList.remove('show'));
+  requestsBackdrop.addEventListener('click', (e) => { if(e.target.id === 'requestsBackdrop') requestsBackdrop.classList.remove('show'); });
+
+  refreshAdminUI();
+}
+
 
 renderApp();
 wireInstall();
