@@ -11,8 +11,9 @@
 <meta name="apple-mobile-web-app-title" content="라커룸 찾기">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#eef1f6">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23b8873c'/%3E%3Ctext x='50' y='64' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif'%3E🔍%3C/text%3E%3C/svg%3E">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23b8873c'/%3E%3Ctext x='50' y='64' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif'%3E🔍%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
 </head>
 <body>
 
@@ -125,7 +126,12 @@ function renderApp(){
         <div class="eyebrow">LOCKER ROOM MAP</div>
         <h1>라커룸 찾기</h1>
       </div>
-      <div class="sync loading" id="syncStatus">불러오는 중</div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button id="installBtn" style="display:none; font-size:11px; font-weight:700; color:#7a4f10; background:#fff7e6; border:1px solid var(--brass); border-radius:8px; padding:6px 10px; cursor:pointer;">
+          + 홈 화면에 추가
+        </button>
+        <div class="sync loading" id="syncStatus">불러오는 중</div>
+      </div>
     </div>
     <div class="searchbar">
       <div class="search-input-wrap">
@@ -160,6 +166,20 @@ function renderApp(){
         <div class="row">
           <button class="btn-cancel" id="modalCancel">취소</button>
           <button class="btn-save" id="modalSave">저장</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="iosBackdrop">
+      <div class="modal">
+        <div class="mtitle">홈 화면에 추가하는 방법</div>
+        <p style="font-size:14px; line-height:1.7; margin:0 0 14px;">
+          아이폰은 자동 설치가 막혀있어서 손으로 두 단계만 해주시면 돼요.<br><br>
+          1️⃣ 화면 하단(또는 상단) <b>공유 버튼</b>(⬆️ 상자 모양)을 누르세요<br>
+          2️⃣ 아래로 내려서 <b>"홈 화면에 추가"</b>를 누르세요
+        </p>
+        <div class="row">
+          <button class="btn-save" id="iosClose" style="flex:1;">확인했어요</button>
         </div>
       </div>
     </div>
@@ -401,6 +421,52 @@ function wireModal(){
 }
 
 renderApp();
+wireInstall();
+
+function isIos(){
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+}
+function isStandalone(){
+  return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+}
+
+let deferredInstallPrompt = null;
+
+function wireInstall(){
+  const installBtn = document.getElementById('installBtn');
+  const iosBackdrop = document.getElementById('iosBackdrop');
+  const iosClose = document.getElementById('iosClose');
+
+  if (isStandalone()) return; // 이미 홈 화면 앱으로 열려있으면 버튼 숨김
+
+  if (isIos()) {
+    installBtn.style.display = 'inline-block';
+    installBtn.addEventListener('click', () => {
+      iosBackdrop.classList.add('show');
+    });
+    iosClose.addEventListener('click', () => iosBackdrop.classList.remove('show'));
+    iosBackdrop.addEventListener('click', (e) => {
+      if(e.target.id === 'iosBackdrop') iosBackdrop.classList.remove('show');
+    });
+  } else {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      installBtn.style.display = 'inline-block';
+    });
+    installBtn.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      installBtn.style.display = 'none';
+    });
+  }
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+}
 </script>
 
 </body>
