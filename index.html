@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>라커룸 찾기</title>
 
 <!-- 홈 화면에 추가했을 때 앱처럼 보이도록 -->
@@ -632,7 +635,17 @@ function wireInstall(){
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // 새 버전이 있는지 즉시 확인
+      reg.update();
+      // 새 서비스워커가 활성화되면(=업데이트되면) 자동으로 화면을 한 번 새로고침
+      let refreshed = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshed) return;
+        refreshed = true;
+        window.location.reload();
+      });
+    }).catch(() => {});
   }
 }
 </script>
