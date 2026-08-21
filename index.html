@@ -140,6 +140,14 @@ function renderApp(){
         <div class="sync loading" id="syncStatus">불러오는 중</div>
       </div>
     </div>
+
+    <div class="banner" id="kakaoBanner" style="border-color:#3c1e1e; background:#fff3cd;">
+      <div class="bname" style="font-size:15px; color:#5c3d09;">카톡 브라우저에서는 앱처럼 설치할 수 없어요</div>
+      <div class="bzone">아래 버튼을 눌러 기본 브라우저로 열면, 홈 화면 추가와 음성 검색이 모두 정상 작동해요</div>
+      <button id="kakaoOpenBtn" style="margin-top:10px; width:100%; padding:12px; border:none; border-radius:10px; background:var(--brass); color:#fff; font-size:15px; font-weight:700; cursor:pointer;">
+        기본 브라우저로 열기
+      </button>
+    </div>
     <div class="searchbar">
       <div class="search-input-wrap">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -593,6 +601,29 @@ function wireAdmin(){
 
 renderApp();
 wireInstall();
+wireKakaoDetection();
+
+function isKakao(){
+  return /KAKAOTALK/i.test(navigator.userAgent);
+}
+
+function wireKakaoDetection(){
+  const kakaoBanner = document.getElementById('kakaoBanner');
+  const kakaoOpenBtn = document.getElementById('kakaoOpenBtn');
+  const installBtn = document.getElementById('installBtn');
+
+  if (!isKakao()) return;
+
+  // 카톡 안에서는 홈 화면 추가 버튼이 어차피 작동하지 않으므로 숨기고, 대신 배너를 보여줍니다.
+  installBtn.style.display = 'none';
+  kakaoBanner.classList.add('show');
+
+  kakaoOpenBtn.addEventListener('click', () => {
+    // 카카오가 공식 제공하는 스킴: 카톡 인앱 브라우저 → 기기 기본 브라우저로 강제 이동
+    const currentUrl = window.location.href;
+    window.location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(currentUrl);
+  });
+}
 
 function isIos(){
   return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
