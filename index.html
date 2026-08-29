@@ -28,9 +28,9 @@
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwQsP3_JJTmG4SceRCwNiKVUdJPjdMkdst-3Urmd1euessReNkQcqvPo6J7vGP50u17qA/exec";
 
   const LABELS = [
-    {text:"출입구", col:1, row:9, colSpan:3, kind:"entrance"},
-    {text:"샤워실", col:21, row:8, colSpan:2, kind:"room"},
-    {text:"샤워실입구", col:21, row:15, colSpan:2, kind:"room-small"},
+    {text:"출입구", col:1, row:9, colSpan:3, rowSpan:2, kind:"entrance"},
+    {text:"샤워실", col:20, row:7, colSpan:3, rowSpan:2, kind:"room"},
+    {text:"샤워실입구", col:20, row:14, colSpan:3, rowSpan:2, kind:"room-small"},
   ];
   const GRID_COLS = 23;
   const GRID_ROWS = 22;
@@ -97,6 +97,19 @@
     z-index:20; background:var(--brass); border-color:var(--brass);
     animation:lockerGlow 1.15s ease-in-out infinite;
   }
+  #app.mode-full .locker.active{ transform:scale(2.4); border-radius:3px; }
+  #app.mode-full .locker.active::before{
+    content:"";
+    position:absolute; inset:-3px;
+    border-radius:50%;
+    border:2.5px solid var(--brass);
+    animation:pingRing 1.4s ease-out infinite;
+    pointer-events:none;
+  }
+  @keyframes pingRing{
+    0%{ transform:scale(.7); opacity:1; }
+    100%{ transform:scale(3.2); opacity:0; }
+  }
   .locker .pin-label{
     position:absolute; left:50%; transform:translateX(-50%);
     bottom:calc(100% + 6px);
@@ -133,14 +146,23 @@
     50%{ box-shadow:0 0 0 3px rgba(184,135,60,1), 0 6px 26px 8px rgba(184,135,60,.6);}
   }
 
-  .label{ display:flex; align-items:center; justify-content:center; font-weight:800; color:var(--paper-dim); text-align:center; overflow:hidden; }
-  .label.entrance{ font-size:9px; color:var(--brass-bright); border-top:2px dashed var(--brass); align-items:flex-start; padding-top:2px;}
-  .label.entrance::before{ content:"⟵"; }
-  .label.room{ font-size:10px; color:var(--paper-dim); background:var(--room); border-radius:3px; border:1.5px solid #97a3b3;}
-  .label.room-small{ font-size:7.5px; color:var(--paper-dim); }
-  #app.mode-zoom .label.entrance{ font-size:13px; }
-  #app.mode-zoom .label.room{ font-size:14px; }
-  #app.mode-zoom .label.room-small{ font-size:10px; }
+  .label{ display:flex; align-items:center; justify-content:center; font-weight:800; text-align:center; overflow:hidden; z-index:2; line-height:1.15; }
+  .label.entrance{
+    font-size:11px; color:#fff; background:var(--brass); border-radius:4px;
+    padding:2px; box-shadow:0 1px 4px rgba(0,0,0,.25);
+  }
+  .label.entrance::before{ content:"⟵ "; }
+  .label.room{
+    font-size:11px; color:#fff; background:var(--night); border-radius:4px;
+    padding:2px; box-shadow:0 1px 4px rgba(0,0,0,.25);
+  }
+  .label.room-small{
+    font-size:9px; color:#fff; background:#6b7686; border-radius:4px;
+    padding:2px; box-shadow:0 1px 4px rgba(0,0,0,.25);
+  }
+  #app.mode-zoom .label.entrance,
+  #app.mode-zoom .label.room{ font-size:15px; padding:4px; }
+  #app.mode-zoom .label.room-small{ font-size:12px; padding:4px; }
 
   .modal-backdrop{ position:fixed; inset:0; background:rgba(20,25,35,.45); display:none; align-items:flex-end; z-index:50;}
   .modal-backdrop.show{ display:flex; }
@@ -304,7 +326,7 @@ function drawFloor(){
       </div>
     `).join('') +
     LABELS.map(lb => `
-      <div class="label ${lb.kind}" style="grid-column:${lb.col} / span ${lb.colSpan};grid-row:${lb.row};">
+      <div class="label ${lb.kind}" style="grid-column:${lb.col} / span ${lb.colSpan};grid-row:${lb.row} / span ${lb.rowSpan || 1};">
         ${lb.text}
       </div>
     `).join('');
