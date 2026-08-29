@@ -86,24 +86,43 @@
   .banner .bchip{ padding:7px 12px; border-radius:999px; background:#fff; border:1px solid var(--brass); color:#7a4f10; font-size:13px; font-weight:700; cursor:pointer; }
   .banner .bchip:active{ background:var(--brass); color:#fff; }
 
-  .stage{ flex:1; overflow:auto; padding:16px; -webkit-overflow-scrolling:touch; background:linear-gradient(180deg, #eef1f6 0%, #dfe5ee 100%);}
-  .floor{ display:grid; gap:3px; width:max-content; }
+  .stage{ flex:1; overflow:hidden; padding:14px; background:linear-gradient(180deg, #eef1f6 0%, #dfe5ee 100%); display:flex; align-items:center; justify-content:center; }
+  .floor-wrap{ width:100%; max-width:100%; aspect-ratio:23/22; }
+  .floor{ display:grid; grid-template-columns:repeat(23, 1fr); grid-template-rows:repeat(22, 1fr); gap:1.5px; width:100%; height:100%; }
 
-  .locker{ position:relative; background:var(--panel); border:1px solid var(--line); border-radius:4px; display:flex; align-items:center; justify-content:center; text-align:center; padding:1px; overflow:visible; transition:opacity .2s ease, transform .25s ease, box-shadow .25s ease; cursor:pointer; box-shadow:0 1px 2px rgba(20,30,45,.06);}
-  .locker .name{ font-size:10.5px; font-weight:700; line-height:1.15; color:#1c2531; word-break:keep-all; white-space:normal;}
-  .locker.dim{ opacity:.28; }
-  .locker.active{ z-index:5; border-color:var(--brass); transform:scale(1.35); animation:lockerGlow 1.2s ease-in-out infinite;}
-  .locker.active .name{ color:#5c3d09; font-size:11.5px; }
+  .locker{ position:relative; background:var(--panel); border:1px solid var(--line); border-radius:1.5px; overflow:visible; transition:opacity .2s ease, transform .2s ease, box-shadow .2s ease; cursor:pointer; }
+  .locker .name{ display:none; }
+  .locker.dim{ opacity:.3; }
+  .locker.active{
+    z-index:20; background:var(--brass); border-color:var(--brass);
+    animation:lockerGlow 1.15s ease-in-out infinite;
+  }
+  .locker .pin-label{
+    position:absolute; left:50%; transform:translateX(-50%);
+    bottom:calc(100% + 5px);
+    background:#1c2531; color:#fff; font-size:12px; font-weight:800;
+    padding:5px 9px; border-radius:7px; white-space:nowrap;
+    box-shadow:0 3px 10px rgba(0,0,0,.25);
+    pointer-events:none;
+  }
+  .locker .pin-label::after{
+    content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+    border:5px solid transparent; border-top-color:#1c2531;
+  }
+  .locker.pin-below .pin-label{ bottom:auto; top:calc(100% + 5px); }
+  .locker.pin-below .pin-label::after{ top:auto; bottom:100%; border-top-color:transparent; border-bottom-color:#1c2531; }
+  .locker.pin-left .pin-label{ left:0; transform:translateX(0); }
+  .locker.pin-right .pin-label{ left:auto; right:0; transform:translateX(0); }
   @keyframes lockerGlow{
     0%,100%{ box-shadow:0 0 0 2px rgba(184,135,60,.9), 0 4px 16px 2px rgba(184,135,60,.35);}
     50%{ box-shadow:0 0 0 3px rgba(184,135,60,1), 0 6px 26px 8px rgba(184,135,60,.6);}
   }
 
-  .label{ display:flex; align-items:center; justify-content:center; font-weight:800; color:var(--paper-dim); text-align:center;}
-  .label.entrance{ font-size:13px; color:var(--brass-bright); border-top:2px dashed var(--brass); align-items:flex-start; padding-top:4px;}
-  .label.entrance::before{ content:"⟵ "; }
-  .label.room{ font-size:14px; color:var(--paper-dim); background:var(--room); border-radius:8px; border:1px solid var(--line);}
-  .label.room-small{ font-size:10px; color:var(--paper-dim); }
+  .label{ display:flex; align-items:center; justify-content:center; font-weight:800; color:var(--paper-dim); text-align:center; overflow:hidden; }
+  .label.entrance{ font-size:6.5px; color:var(--brass-bright); border-top:1.5px dashed var(--brass); align-items:flex-start; padding-top:2px;}
+  .label.entrance::before{ content:"⟵"; }
+  .label.room{ font-size:7px; color:var(--paper-dim); background:var(--room); border-radius:3px; border:1px solid var(--line);}
+  .label.room-small{ font-size:5.5px; color:var(--paper-dim); }
 
   .modal-backdrop{ position:fixed; inset:0; background:rgba(20,25,35,.45); display:none; align-items:flex-end; z-index:50;}
   .modal-backdrop.show{ display:flex; }
@@ -171,7 +190,7 @@ function renderApp(){
     </div>
 
     <div class="stage" id="stage">
-      <div class="floor" id="floor"></div>
+      <div class="floor-wrap"><div class="floor" id="floor"></div></div>
     </div>
 
     <div class="modal-backdrop" id="modalBackdrop">
@@ -220,10 +239,6 @@ function renderApp(){
       </div>
     </div>
   `;
-
-  const floor = document.getElementById('floor');
-  floor.style.gridTemplateColumns = `repeat(${GRID_COLS},42px)`;
-  floor.style.gridTemplateRows = `repeat(${GRID_ROWS},42px)`;
 
   loadData();
   wireSearch();
@@ -285,10 +300,25 @@ function wireSearch(){
   const bname = document.getElementById('bname');
   const bzone = document.getElementById('bzone');
   const bchips = document.getElementById('bchips');
-  const stage = document.getElementById('stage');
 
   function clearHighlights(){
-    Array.from(document.querySelectorAll('.locker')).forEach(el => el.classList.remove('active','dim'));
+    Array.from(document.querySelectorAll('.locker')).forEach(el => {
+      el.classList.remove('active','dim','pin-below','pin-left','pin-right');
+      const pin = el.querySelector('.pin-label');
+      if (pin) pin.remove();
+    });
+  }
+
+  function addPin(el){
+    const col = Number(el.dataset.col);
+    const row = Number(el.dataset.row);
+    if (row <= 2) el.classList.add('pin-below');
+    if (col <= 2) el.classList.add('pin-left');
+    if (col >= GRID_COLS - 2) el.classList.add('pin-right');
+    const pin = document.createElement('div');
+    pin.className = 'pin-label';
+    pin.textContent = el.dataset.name;
+    el.appendChild(pin);
   }
 
   function focusOne(el){
@@ -297,17 +327,10 @@ function wireSearch(){
       if(x === el) x.classList.add('active');
       else x.classList.add('dim');
     });
+    addPin(el);
     bname.textContent = el.dataset.name;
     bzone.textContent = el.dataset.zone;
     bchips.innerHTML = '';
-
-    const stageRect = stage.getBoundingClientRect();
-    const targetRect = el.getBoundingClientRect();
-    stage.scrollTo({
-      left: stage.scrollLeft + (targetRect.left - stageRect.left) - stageRect.width/2 + targetRect.width/2,
-      top: stage.scrollTop + (targetRect.top - stageRect.top) - stageRect.height/2 + targetRect.height/2,
-      behavior:'smooth'
-    });
   }
 
   function runSearch(query){
@@ -341,7 +364,7 @@ function wireSearch(){
       return;
     }
 
-    // 여러 명 매치 -> 선택하도록 칩으로 보여주고, 일단 첫 번째로 이동
+    // 여러 명 매치 -> 선택하도록 칩으로 보여주고, 전부 살짝 강조
     bname.textContent = `${matches.length}명 찾음 — 아래에서 선택하세요`;
     bzone.textContent = '';
     bchips.innerHTML = matches.map((m,i) => `<div class="bchip" data-idx="${i}">${m.dataset.name} · ${m.dataset.zone}</div>`).join('');
@@ -352,14 +375,6 @@ function wireSearch(){
     lockerEls.forEach(el => {
       if(matches.includes(el)) el.classList.add('active');
       else el.classList.add('dim');
-    });
-    const target = matches[0];
-    const stageRect = stage.getBoundingClientRect();
-    const targetRect = target.getBoundingClientRect();
-    stage.scrollTo({
-      left: stage.scrollLeft + (targetRect.left - stageRect.left) - stageRect.width/2 + targetRect.width/2,
-      top: stage.scrollTop + (targetRect.top - stageRect.top) - stageRect.height/2 + targetRect.height/2,
-      behavior:'smooth'
     });
   }
 
