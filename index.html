@@ -42,7 +42,7 @@
   :root{
     --bg1:#e9edf3; --bg2:#f6f8fb; --panel:#ffffff; --line:#c7d0dc;
     --paper:#1c2531; --paper-dim:#5b6779; --brass:#b8873c; --brass-bright:#8a5f14;
-    --wall:#e2e7ee; --room:#eef1f6; --ok:#1f9d6e; --danger:#d94f39;
+    --wall:#e2e7ee; --room:#eef1f6; --ok:#1f9d6e; --danger:#d94f39; --night:#3c4a6b;
   }
   *{box-sizing:border-box;}
   html,body{
@@ -251,7 +251,7 @@ function renderApp(){
     <div class="searchbar">
       <div class="search-input-wrap">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="searchInput" type="text" placeholder="이름 검색" autocomplete="off" />
+        <input id="searchInput" type="text" placeholder="이름 검색 (초성 가능: ㄱㅎㅅ)" autocomplete="off" />
         <button class="clear-btn" id="clearBtn">✕</button>
       </div>
       <button id="micBtn" aria-label="음성 검색">
@@ -346,8 +346,76 @@ function drawFloor(){
     const l = LOCKERS[i];
     el.style.gridColumn = l.col;
     el.style.gridRow = l.row;
-    el.addEventListener('click', () => openEditModal(el));
+    el.addEventListener('click', () => {
+      if (currentMode === 'full') {
+        showFullModeEditHint();
+      } else {
+        openEditModal(el);
+      }
+    });
   });
+}
+
+/* ---- 초성 검색 ---- */
+const CHOSUNG_LIST = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+function getChosung(str){
+  let result = '';
+  for (const ch of str) {
+    const code = ch.charCodeAt(0) - 0xAC00;
+    if (code >= 0 && code <= 11171) {
+      result += CHOSUNG_LIST[Math.floor(code / 588)];
+    } else {
+      result += ch;
+    }
+  }
+  return result;
+}
+function isChosungQuery(str){
+  return /^[ㄱ-ㅎ]+$/.test(str);
+}
+function nameMatches(name, query){
+  if (isChosungQuery(query)) return getChosung(name).includes(query);
+  return name.includes(query);
+}
+
+/* ---- 좌/우, 위/아래 순서 안내 ---- */
+function getOrdinalText(el){
+  const zone = el.dataset.zone;
+  const col = Number(el.dataset.col);
+  const row = Number(el.dataset.row);
+  const group = LOCKERS.filter(l => l.zone === zone);
+  if (group.length <= 1) return '';
+
+  const sameRow = group.every(g => g.row === group[0].row);
+  if (sameRow) {
+    const sorted = [...group].sort((a,b) => a.col - b.col);
+    const idx = sorted.findIndex(g => g.col === col && g.row === row);
+    if (idx < 0) return '';
+    return `왼쪽에서 ${idx+1}번째 · 오른쪽에서 ${sorted.length-idx}번째`;
+  } else {
+    const sorted = [...group].sort((a,b) => a.row - b.row);
+    const idx = sorted.findIndex(g => g.col === col && g.row === row);
+    if (idx < 0) return '';
+    return `위에서 ${idx+1}번째 · 아래에서 ${sorted.length-idx}번째`;
+  }
+}
+
+/* ---- 전체보기 모드에서 락커 탭했을 때 안내 ---- */
+let hintTimer = null;
+function showFullModeEditHint(){
+  const banner = document.getElementById('banner');
+  const bname = document.getElementById('bname');
+  const bzone = document.getElementById('bzone');
+  const bchips = document.getElementById('bchips');
+  banner.classList.add('show');
+  banner.classList.remove('empty');
+  bchips.innerHTML = '';
+  bname.textContent = '✏️ 이름 변경 요청은 크게보기 모드에서';
+  bzone.textContent = '상단 "🔍 크게보기"로 전환한 뒤, 칸을 눌러 요청해주세요';
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => {
+    if (bname.textContent.includes('크게보기')) banner.classList.remove('show');
+  }, 3200);
 }
 
 async function loadData(){
@@ -410,7 +478,8 @@ function wireSearch(){
       else x.classList.add('dim');
     });
     bname.textContent = el.dataset.name;
-    bzone.textContent = el.dataset.zone;
+    const ordinal = getOrdinalText(el);
+    bzone.textContent = ordinal ? `${el.dataset.zone} · ${ordinal}` : el.dataset.zone;
     bchips.innerHTML = '';
 
     if (currentMode === 'full') {
@@ -439,7 +508,7 @@ function wireSearch(){
     }
     clearBtn.classList.add('show');
     const lockerEls = Array.from(document.querySelectorAll('.locker'));
-    const matches = lockerEls.filter(el => el.dataset.name.includes(q));
+    const matches = lockerEls.filter(el => nameMatches(el.dataset.name, q));
     currentMatches = matches;
     banner.classList.add('show');
 
