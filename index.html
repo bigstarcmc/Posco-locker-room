@@ -141,6 +141,9 @@
   /* ---- 모드 토글 ---- */
   .mode-toggle{ display:flex; gap:6px; padding:10px 14px 0; }
   .mode-btn{ flex:1; padding:9px 6px; border-radius:9px; border:1px solid var(--line); background:var(--panel); color:var(--paper-dim); font-size:12.5px; font-weight:700; cursor:pointer; }
+  .mode-hint{ display:none; font-size:11.5px; color:var(--paper-dim); text-align:center; padding:7px 14px 0; }
+  .mode-hint b{ color:var(--brass-bright); }
+  #app.mode-full .mode-hint{ display:block; }
   .mode-btn.active{ background:var(--brass); border-color:var(--brass); color:#fff; }
 
   /* ---- 크게보기 모드 ---- */
@@ -240,6 +243,7 @@ function renderApp(){
       <button class="mode-btn" data-mode="full">🗺️ 전체보기</button>
       <button class="mode-btn" data-mode="zoom">🔍 크게보기</button>
     </div>
+    <div class="mode-hint" id="modeHint">✏️ 이름 변경 요청은 <b>크게보기</b> 모드에서 칸을 눌러 보낼 수 있어요</div>
 
     <div class="banner" id="kakaoBanner" style="border-color:#3c1e1e; background:#fff3cd;">
       <div class="bname" style="font-size:15px; color:#5c3d09;">카톡 브라우저에서는 앱처럼 설치할 수 없어요</div>
